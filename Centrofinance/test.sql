@@ -198,6 +198,7 @@ IS 'вид статуса контракта';
 -- 
 -- ----------------------------------------------------------------------
 
+
 --
 -- Создаю таблицу v_contract
 --
@@ -237,32 +238,33 @@ INSERT INTO v_contract (contract_id,
 					    min_loan_amount,
      					max_loan_amount)
 						
-    SELECT tdcc.contract_id, -- ID контракта.
-	       tdc.contract_code, -- Код контракта.
-		   tdc.customer_id, -- ID клиента.
+    SELECT tdc.customer_id, -- ID контракта.
+--	       tdc.contract_code, -- Код контракта.
+		   tdc.contract_id, -- ID клиента.
 		   tdcc.condition_id, -- ID документа о заключении контракта.
-		   tdc.subdivision_id, -- ID подразделения, заключившего контракт.
+--		   tdc.subdivision_id, -- ID подразделения, заключившего контракт.
 		   row_number() over (
 			                partition by tdc.customer_id 
 			                order by tdc.issue_dt asc) as contract_serial_number, -- Порядковый номер контракта у клиента.
-		   row_number() over (
+		   dense_rank() over ( 
 			                partition by tdc.customer_id 
-			                order by tdc.issue_dt DESC) as contract_renewal_serial_number, -- Порядковый номер контракта у клиента без учёта переоформлений. Если контракт является переоформлением, порядковый номер не должен увеличиваться.
-			
+			                order by tdc.contract_id  asc) as contract_renewal_serial_number, -- Порядковый номер контракта у клиента без учёта переоформлений. Если контракт является переоформлением, порядковый номер не должен увеличиваться.
+		   							
 		   irt.is_renewal, -- Является ли данный контракт переоформлением.
 		   iit.is_installment, -- Является ли данный контракт долгосрочным (наличие нескольких платежей в плане погашений).
-		   iit.prolong_count, -- Количество продлений.
-	 	   fid.first_issue_dt, -- Дата первого контракта у клиента.
-	 	   tdc.issue_dt, -- Дата выдачи займа.
-	  	   la.loan_amount, -- Сумма займа. Суммируются все платежи по графику.
-	 	   tla_sum.total_loan_amount,  -- Сумма всех предыдущих займов.
-		   tla_min.min_loan_amount, -- Минимальная сумма предыдущих займов.
-     	   tla_max.max_loan_amount -- Максимальная сумма предыдущих займов.
+		   cc.prolong_count--, -- Количество продлений.
+--	 	   fid.first_issue_dt, -- Дата первого контракта у клиента.
+--	 	   tdc.issue_dt, -- Дата выдачи займа.
+--	  	   la.loan_amount--, -- Сумма займа. Суммируются все платежи по графику.
+--	 	   tla_sum.total_loan_amount,  -- Сумма всех предыдущих займов.
+--		   tla_min.min_loan_amount, -- Минимальная сумма предыдущих займов.
+--     	   tla_max.max_loan_amount -- Максимальная сумма предыдущих займов.
 	 	   
     FROM test_data_contract AS tdc
 	
-	JOIN test_data_contract_conditions AS tdcc -- join test_data_contract c test_data_contract_conditions
+	JOIN test_data_contract_conditions AS tdcc
 	  ON tdc.contract_id=tdcc.contract_id
+
 	  
 	JOIN (SELECT contract_id, -- Выясняем является ли контракт переоформленным
 				CASE 
@@ -272,81 +274,108 @@ INSERT INTO v_contract (contract_id,
 		  FROM test_data_contract) as irt 
 	  ON tdc.contract_id=irt.contract_id
 	  
-	JOIN (SELECT test_data_contract_conditions_payment_plan.condition_id, -- Является ли контракт долгосрочным и кол-во продлений
-				CASE 
-					WHEN contract_serial_number > 1 THEN true
+	JOIN (with table_test as -- Является ли контракт долгосрочным
+			(select condition_id, count(loan_amount) as prolong_pay
+			 from test_data_contract_conditions_payment_plan
+			 group by condition_id)
+		
+		select condition_id, prolong_pay,
+			CASE 
+					WHEN prolong_pay > 1 THEN true
 					ELSE false
-			    END AS is_installment,
-		        COUNT(is_installment_table_temp.condition_id) AS prolong_count
-		  FROM test_data_contract_conditions_payment_plan LEFT JOIN 
-							(select condition_id, count(condition_id) 
-							 over (partition by condition_id) as contract_serial_number 
-							 from test_data_contract_conditions_payment_plan) AS is_installment_table_temp
-							 ON is_installment_table_temp.condition_id=test_data_contract_conditions_payment_plan.condition_id 
-		  GROUP BY is_installment_table_temp.condition_id,
-		           test_data_contract_conditions_payment_plan.condition_id,
-		           is_installment_table_temp.contract_serial_number) AS iit
+			END AS is_installment
+		from table_test) AS iit
 	    ON tdcc.condition_id=iit.condition_id
+	
+	 join (select contract_id, count(condition_type) as prolong_count
+		   FROM test_data_contract_conditions
+		   where condition_type='Продление'
+		   group by contract_id) as cc
+	   ON tdc.contract_id=cc.contract_id
 		
-	  JOIN (SELECT contract_id, MIN(issue_dt) AS first_issue_dt -- Дата первого контракта у клиента
-			FROM test_data_contract
-			GROUP BY contract_id) AS fid 
-	    ON fid.contract_id=tdc.contract_id
 		
-	  JOIN (SELECT condition_id, SUM(loan_amount) AS loan_amount -- Сумма всех займов
-            FROM test_data_contract_conditions_payment_plan
-            GROUP BY condition_id) AS la
-	 	ON tdcc.condition_id=la.condition_id
 		
-	  JOIN (SELECT tdccpp.condition_id, SUM(tdccpp.loan_amount) AS total_loan_amount -- Сумма предыдущих займов   
-		    FROM test_data_contract_conditions_payment_plan AS tdccpp
-            WHERE tdccpp.condition_id IN
-			  (SELECT tdcc.condition_id
-			   FROM test_data_contract as tdc
-			   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
-			   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
-			   WHERE tdcs.status_type = 'Закрыт'
-			   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
-			GROUP BY tdccpp.condition_id) AS tla_sum
-	    ON tdcc.condition_id=tla_sum.condition_id
+--	  JOIN (SELECT contract_id, MIN(issue_dt) AS first_issue_dt -- Дата первого контракта у клиента
+--			FROM test_data_contract
+--			GROUP BY contract_id) AS fid 
+--	    ON fid.contract_id=tdc.contract_id
 		
-	  JOIN (SELECT tdccpp.condition_id, MIN(tdccpp.loan_amount) AS min_loan_amount -- Сумма мин предыдущих займов 
-		    FROM test_data_contract_conditions_payment_plan AS tdccpp
-            WHERE tdccpp.condition_id IN
-			  (SELECT tdcc.condition_id
-			   FROM test_data_contract as tdc
-			   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
-			   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
-			   WHERE tdcs.status_type = 'Закрыт'
-			   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
-			GROUP BY tdccpp.condition_id) AS tla_min
-	    ON tdcc.condition_id=tla_min.condition_id
-		
-	  JOIN (SELECT tdccpp.condition_id, MAX(tdccpp.loan_amount) AS max_loan_amount -- Сумма мах предыдущих займов 
-		    FROM test_data_contract_conditions_payment_plan AS tdccpp
-            WHERE tdccpp.condition_id IN
-			  (SELECT tdcc.condition_id
-			   FROM test_data_contract as tdc
-			   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
-			   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
-			   WHERE tdcs.status_type = 'Закрыт'
-			   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
-			GROUP BY tdccpp.condition_id) AS tla_max
-	    ON tdcc.condition_id=tla_max.condition_id
-		
-    LIMIT 1000;
+--	  JOIN (SELECT condition_id, SUM(loan_amount) AS loan_amount -- Сумма всех займов
+--            FROM test_data_contract_conditions_payment_plan
+--            GROUP BY condition_id) AS la
+--	 	ON tdcc.condition_id=la.condition_id
 
+--	  JOIN (SELECT tdccpp.condition_id, SUM(tdccpp.loan_amount) AS total_loan_amount -- Сумма предыдущих займов   
+--		    FROM test_data_contract_conditions_payment_plan AS tdccpp
+--            WHERE tdccpp.condition_id IN
+--			  (SELECT tdcc.condition_id
+--			   FROM test_data_contract as tdc
+--			   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
+--			   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
+--			   WHERE tdcs.status_type = 'Закрыт'
+--			   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
+--			GROUP BY tdccpp.condition_id) AS tla_sum
+--	    ON tdcc.condition_id=tla_sum.condition_id
+		
+--	  JOIN (SELECT tdccpp.condition_id, MIN(tdccpp.loan_amount) AS min_loan_amount -- Сумма мин предыдущих займов 
+--		    FROM test_data_contract_conditions_payment_plan AS tdccpp
+--            WHERE tdccpp.condition_id IN
+--			  (SELECT tdcc.condition_id
+--			   FROM test_data_contract as tdc
+--			   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
+--			   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
+--			   WHERE tdcs.status_type = 'Закрыт'
+--			   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
+--			GROUP BY tdccpp.condition_id) AS tla_min
+--	    ON tdcc.condition_id=tla_min.condition_id
+		
+--	  JOIN (SELECT tdccpp.condition_id, MAX(tdccpp.loan_amount) AS max_loan_amount -- Сумма мах предыдущих займов 
+--		    FROM test_data_contract_conditions_payment_plan AS tdccpp
+--            WHERE tdccpp.condition_id IN
+--			  (SELECT tdcc.condition_id
+--			   FROM test_data_contract as tdc
+--			   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
+--			   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
+--			   WHERE tdcs.status_type = 'Закрыт'
+--			   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
+--			GROUP BY tdccpp.condition_id) AS tla_max
+--	    ON tdcc.condition_id=tla_max.condition_id
+				
+	 JOIN (SELECT tdc.customer_id, 
+			   tdc.contract_id,  
+			   sum(tdccpp.loan_amount) AS col1, 
+			   min(tdccpp.loan_amount) AS col2, 
+			   max(tdccpp.loan_amount) AS col3
+				FROM test_data_contract_conditions_payment_plan AS tdccpp
+				RIGHT JOIN test_data_contract_conditions AS tdcc ON tdcc.condition_id = tdccpp.condition_id
+				RIGHT JOIN test_data_contract AS tdc ON tdc.contract_id = tdcc.contract_id
+				WHERE tdccpp.condition_id IN
+				  (SELECT tdcc.condition_id
+				   FROM test_data_contract as tdc
+				   LEFT JOIN test_data_contract_status as tdcs ON  tdc.contract_id=tdcs.contract_id
+				   LEFT JOIN test_data_contract_conditions as tdcc ON  tdc.contract_id=tdcc.contract_id 
+				   WHERE tdcs.status_type='Закрыт'
+				   ORDER BY tdc.customer_id, tdc.contract_id, tdcs.status_dt)
+				GROUP BY  tdc.customer_id,  tdc.contract_id) AS tla_sum_min_max
+		ON tdc.contract_id=tla_sum_min_max.contract_id
 
+--    LIMIT 1000;
 --
 -----------------------------------------------------------------------------
 --
 
-
+/*
+	Спасибо за интересное тестовое, было увлекательно, большая витрина, думаю в будущем проверю данную витрину(когда доделаю) на чистоту данных с помощью
+	python(pandas и numpy), так же интересно по ней сделать дашборд в Tableau.
+	Не хватило времени сделать тестовое полностью... НО его я доделю для себя.
+	Так же хотел попросить от Вас обратную связь, что можно сделать лучше, какой подход применить и тд.
+	Телефон для связи 89122795209 Александр (telegram, whatsapp)
+*/
 
 -- 
 -- Тестовые запросы 
 --
-SELECT * FROM v_contract; -- test_data_contract_conditions -- test_data_contract_conditions_payment_plan
+SELECT * FROM test_data_contract_conditions; -- test_data_contract_conditions -- test_data_contract_conditions_payment_plan
 						  -- test_data_contract_status -- test_data_contract -- v_contract
 EXPLAIN SELECT * FROM v_contract;
 DROP TABLE v_contract;
