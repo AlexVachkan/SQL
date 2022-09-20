@@ -1,6 +1,4 @@
-﻿-- Вечканов АА 16.09.2022
-
-SELECT version();
+﻿SELECT version();
 -- PostgreSQL 14.5
 
 --
@@ -402,7 +400,58 @@ INSERT INTO v_contract (customer_id,
 	    ON tdc.contract_id=ud.closed_contract
 
 --
------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+--
+--
+--1. Выбрать клиентов, пришедших в 2019 году (т.е. первый договор датирован 2019 годом).
+--
+with temp_table as (
+	select customer_id, min(issue_dt) as dt 
+	from v_contract
+	group by customer_id)
+select *
+from temp_table
+where dt BETWEEN '2019-01-01' AND '2019-12-31'
+/*214 клиентов пришли в 2019 году */
+--
+----------------------------------------------------------------------------------------
+--
+
+--
+-- 2. Сгруппировать клиентов в группы по году и месяцу первого контракта.
+--
+with temp_table as (
+	select customer_id, min(issue_dt) as dt_start 
+	from v_contract
+	group by customer_id)
+select *, extract(year from dt_start) as year_start,  extract(month from dt_start) as month_start 
+from temp_table 
+order by year_start, month_start
+--
+----------------------------------------------------------------------------------------
+--
+--
+-- 3. В каждой группе определить клиента (-ов) с максимальным порядковым номером контракта клиента.  ??????????
+--
+with temp_table as (
+	select customer_id, min(issue_dt) as dt_start, max(contract_serial_number) as contract_serial_number 
+	from v_contract
+	group by customer_id)
+select *, extract(year from dt_start) as year_start,  extract(month from dt_start) as month_start, contract_serial_number  
+from temp_table 
+order by year_start, month_start
+--
+----------------------------------------------------------------------------------------
+--
+
+--
+-- 4. Определить во сколько раз увеличилась сумма последнего контракта относительно первого по найденным клиентам в каждой группе.???
+--
+select customer_id, min(contract_renewal_serial_number), max(contract_renewal_serial_number), sum(loan_amount)
+from v_contract
+group by customer_id
+--
+----------------------------------------------------------------------------------------
 --
 
 
