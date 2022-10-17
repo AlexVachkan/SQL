@@ -1,4 +1,5 @@
 -- \dn вывод схем бд
+-- \d public.aircrafts структура таблицы
 
 -- ГЛАВА 3
 
@@ -80,3 +81,28 @@ select aircraft_code, fare_conditions, count(*) -- так как integer оди�
 from bookings.seats
 group by aircraft_code, fare_conditions
 order by count(seat_no) desc
+
+-- Контрольный вопросы ГЛАВЫ 3
+
+--1
+insert into public.aircrafts -- не пишу атрибуты 
+values ('SU9', 'Сухой Суперджет-100', 3000)
+-- ERROR: ОШИБКА:  повторяющееся значение ключа нарушает ограничение уникальности "aircrafts_pkey"
+-- ОТВЕТ: Значения первичного ключа, как и любого возможного ключа, уникальны!
+
+--2
+select * 
+from public.aircrafts
+order by range desc
+
+--3
+update public.aircrafts 
+set range = range * 2 -- можно писать арфиметичскоге выражения 
+where aircraft_code='SU9';
+
+select * from public.aircrafts;
+
+--4
+delete from public.aircrafts
+where range<1000 or range>11200;
+-- DELETE 0
