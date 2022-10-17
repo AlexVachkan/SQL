@@ -1,4 +1,7 @@
 -- \dn вывод схем бд
+
+-- ГЛАВА 3
+
 create table public.aircrafts
 (aircraft_code char(3) not null,
 model text not null,
@@ -27,7 +30,7 @@ where aircraft_code='CN1';
 
 select * from public.aircrafts;
 
-drop table aircraft;
+drop table public.aircrafts;
 -----------------------------------
 -- создаю таблицу seats. Это ссылающаяся таблица на aircrafts(ссылочная).
 create table public.seats
@@ -47,5 +50,33 @@ create table public.seats
 insert into public.seats values ('123', '1A', 'bisiness');
 -- Ключ (aircraft_code)=(123) отсутствует в таблице "aircrafts".
 
-select * from bookings.seats
+-- Добавим данные в public.seats(Для работы будем использовать dookings.seats)
+insert into public.seats
+values 
+('773', '1A', 'bisiness'),
+('SU9', '1AB', 'comfort');
 
+-- Приверим добавление данных
+select * from public.seats
+
+-- Посчитаем количество месть у SU9
+select count(seat_no)
+from bookings.seats
+where aircraft_code='SU9';
+
+-- Посчитаем количество месть у каждого самолета
+select aircraft_code, count(seat_no)
+from bookings.seats
+group by aircraft_code 
+
+-- Отсортируем количество месть у каждого самолета
+select aircraft_code, count(seat_no)
+from bookings.seats
+group by aircraft_code
+order by count(seat_no) desc -- desc от большего к меньшему, без - от меньшего к большему
+
+-- Посчитаем количество месть у каждого самолета и каждого класса комфорта
+select aircraft_code, fare_conditions, count(*) -- так как integer один атрибут, то можно использовать *
+from bookings.seats
+group by aircraft_code, fare_conditions
+order by count(seat_no) desc
