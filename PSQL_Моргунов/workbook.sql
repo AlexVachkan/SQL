@@ -106,3 +106,16 @@ select * from public.aircrafts;
 delete from public.aircrafts
 where range<1000 or range>11200;
 -- DELETE 0
+
+
+-- ГЛАВА 4
+
+-- Числовые типы:
+/* 
+целочисленные: smallint, integer, bigint
+фиксир точность: numeric, decimal(numeric(6,4)=12,1525 точность-6, масштаб-4)
+
+
+
+
+
