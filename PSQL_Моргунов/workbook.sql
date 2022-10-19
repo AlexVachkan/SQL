@@ -111,11 +111,100 @@ where range<1000 or range>11200;
 -- ГЛАВА 4
 
 -- Числовые типы:
-/* 
+ 
 целочисленные: smallint, integer, bigint
-фиксир точность: numeric, decimal(numeric(6,4)=12,1525 точность-6, масштаб-4)
+фиксир точность: numeric, decimal (numeric(6,4)=12,1525 точность-6, масштаб-4)
+уникальные целые значения: serial
+	create public.table_test 
+	(column numeric(3,2));
+	
+-- Символьные типы:
+
+Точное число символов: char(3)
+Не более число символов: varchar(10)
+Любое число символов(255): text
+-- '...''...'(Е...\'..)  одна кoвычка в тексте
+-- '...\n...'  след строка в тексте
+
+-- Типы дата\время:
+date - дата
+time - время
+timestamp - дата и время
+timestamptz - дата и время с учетом часового пояса
+interval - интервал 
 
 
+	select '2016-12-31'::date;
+	select 'Dec 31, 2016'::date;
+	select current_date; - сегодняшняя дата
+	select to_char(current_date, 'dd-mm-yyyy'); - изм. формата даты
 
+	select '20:15:27'::time; или ('8:15:27 am(pm)')
+	select current_time; - сегодняшняя время
 
+	select timestamptz '2016-12-31 21:59:48' - с учетом часового пояса
+	select timestamp '2016-12-31 21:59:48' - без учета часового пояса
+	select current_timestamp; - текущая дата и время
+	
+	select '1 year 2 month ago'::interval; - ago добавляет минус
+	select ('2016-12-20'::timestamp - '2016-12-10'::timestamp)::interval; - интервал как отрезок времени
 
+	select date_trunc('hour', current_timestamp); - усекает время до часу
+	select extract('hour', current_timestamp); - извлекает час из времени	   
+
+-- логический тип:
+
+boolean - 'true','y','yes','on','1'('false','n','not','off','0')
+
+	create table public.test 
+	(is_open_source boolean, 
+	db_name text);
+	
+	insert into public.test 
+	values(true, 'psql'),
+		  (false, 'orac'),
+		  (true, 'mysql'),
+		  (false, 'mysql server');
+		  
+	select *
+	from public.test;
+	
+	explain select *
+	from public.test;
+	
+	select *
+	from public.test
+	where is_open_source; -- выводит только true
+
+	drop table  public.test;
+
+-- массивы:
+
+	create table public.test
+	(name text,
+	 mas integer[]);
+	
+	insert into public.test
+	values ('ivan', '{1,2,3,5,6,7}'::integer[]),
+		   ('petr', '{1,2,3}'::integer[]),
+		   ('igor', '{1,3,6}'::integer[]),
+		   ('alex', '{1,6,7}'::integer[]);
+	
+	select *
+	from public.test;
+	
+	explain select *
+	from public.test;
+	
+	update public.test 
+	set mas = mas || 7 -- добавляем в массив
+	where name = 'igor';
+	
+	update public.test 
+	set mas = array_append(mas, 2) -- добавляем в массив (array_remove - удалить)
+	where name = 'igor';
+	
+	
+	
+	
+	
