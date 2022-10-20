@@ -205,6 +205,68 @@ boolean - 'true','y','yes','on','1'('false','n','not','off','0')
 	where name = 'igor';
 	
 	
+	update public.test
+	set mas[1]=13        -- заменяем значение по индексу (set mass[1:2]=ARRAY[13,14] или по срезу) 
+	where name='igor';
 	
+	drop table  public.test;
 	
+-- основные операции с массивами	
+	
+	select *
+	from public.test
+	where array_position(mas, 13) is not null  -- выборка из таблицы, найдем тех у кого есть цифра 13
+	
+	select *
+	from public.test
+	where mas @> '{13,2}'::integer[];  -- @> - сравнивает левый и правый массив(и 13 и 2)	
+	
+	select *
+	from public.test
+	where mas && array[13,2];  -- && - сравнивает левый и и вхождение в правый массив(или 13 или 2)
+	
+	select *
+	from public.test
+	where not (mas && array[13,2]);  -- && - сравнивает левый и НЕ вхождение в правый массив(или 13 или 2)
+	
+	select unnest(mas) as massiv_table
+	from public.test
+	where name='igor'; -- разоваричиваение массива в виде столба
+	
+	drop table  public.test;
+	
+-- Типы JSON:
+
+	CREATE TABLE public.test
+	(name text,
+	hobbi jsonb);
+
+
+	INSERT INTO public.test
+	VALUES ( 'Ivan',
+	'{ "sports": [ "футбол", "плавание" ],
+	"home_lib": true, "trips": 3
+	}'::jsonb
+	),
+	( 'Petr',
+	'{ "sports": [ "теннис", "плавание" ],
+	"home_lib": true, "trips": 2
+	}'::jsonb
+	),
+	( 'Pavel',
+	'{ "sports": [ "плавание" ],
+	"home_lib": false, "trips": 4
+	}'::jsonb
+	),
+	( 'Boris',
+	'{ "sports": [ "футбол", "плавание", "теннис" ],
+	"home_lib": true, "trips": 0
+	}'::jsonb
+	);
+	
+	select *
+	from public.test
+
+
+
 	
