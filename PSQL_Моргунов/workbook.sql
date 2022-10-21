@@ -265,8 +265,52 @@ boolean - 'true','y','yes','on','1'('false','n','not','off','0')
 	);
 	
 	select *
+	from public.test;
+
+-- основные операции с json
+
+	select *
 	from public.test
+	where hobbi @> '{ "sports":["футбол"] }'::jsonb; -- @> - сравнивает левый и правый массив
+	
+	select name, hobbi->'sports' as sports
+	from public.test
+	where hobbi->'sports' @> '["футбол"]'::jsonb; -- hobbi->'sports' обращение к ключу sports
+	
+	select count(*)
+	from public.test
+	where hobbi ? 'sports'; -- проверим сколько ключей 'sports'
+	
+	update public.test
+	set hobbi = hobbi || '{ "sports":["хоккей"] }' -- изменение json
+	where name = 'Boris';
+	
+	update public.test
+	set hobbi = jsonb_set(hobbi, '{sports, 1}', '"футбол"') -- изменение json с помощью json_set, добавил элемент под индексом 1
+	where name = 'Boris';	                                -- jsonb_set(target jsonb, path text[], new_value jsonb [, create_missing boolean]))
+	
+	drop table public.test;
+-- Контрольный вопросы ГЛАВЫ 4
+
+-- 1
+create table public.test_numeric
+(
+number numeric(5,2),
+descript text
+);
+
+insert into public.test_numeric (number, descript)
+values 
+    (999.9999, 'первое измен'),
+	(999.9009, 'второе измен'),
+	(999.1111, 'третье измен'),
+	(998.9999, 'четвертое измен');
 
 
+	
+	
+	
+	
+	
 
 	
