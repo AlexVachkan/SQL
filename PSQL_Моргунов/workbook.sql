@@ -305,12 +305,81 @@ values
 	(999.9009, 'второе измен'),
 	(999.1111, 'третье измен'),
 	(998.9999, 'четвертое измен');
+-- ОТВЕТ: ОШИБКА: переполнение поля numeric
 
+drop table public.test_numeric;
 
-	
-	
-	
-	
-	
+-- 2
+create table public.test_numeric
+(
+	number numeric,
+	descript text
+);
 
+insert into public.test_numeric
+values
+(1234567890.0987654321, 'точность 20, масштаб 10'),
+(1.5, 'точность 2, масштаб 1'),
+(0.12345678901234567890, 'точность 21, масштаб 20'),
+(1234567890, 'точность 10, масштаб 0');
+
+select * from public.test_numeric;
 	
+drop table public.test_numeric;
+
+-- 3
+select 'nan'::numeric>1000; -- нумерик поддерживает нан
+
+-- 4
+select '5e-307'::double precision > '4e-307'::double precision; -- true. double precision диапазон(1е-307:1е307)
+select '5e-324'::double precision > '4e-324'::double precision; -- false. Так как сильно выходит за диапазон
+
+select '5e-37'::real > '4e-37'::real; -- true. double precision диапазон(1е-37:1е37)
+select '5e-47'::real > '4e-47'::real; -- ОШИБКА:  "5e-47" вне диапазона для типа real.
+
+-- 5
+select '-inf'::double precision > '4e-307' -- double precision поддерживает inf и -inf
+select '-inf'::real > '4e-37' -- real поддерживает inf и -inf
+
+-- 6
+select 0.0*'inf'::real; -- real and double precision поддерживает  NaN
+select 'nan'::real>'inf'::real; -- nan больше любого друго числа
+
+-- 7 
+create table public.test_serial -- тип сериал служит для проствления суррогатны уникальных ключей
+(
+	id serial,
+	name text
+);
+
+insert into public.test_serial (name)
+values
+('вишевая'),
+('малиновая'),
+('черниковая');
+
+select * from public.test_serial;
+
+insert into public.test_serial -- не влияет на автоматич проставление id
+values
+(10, 'ягодная');
+
+select * from public.test_serial;
+
+insert into public.test_serial(name)
+values
+('плодовая');
+
+select * from public.test_serial;
+/*
+id    name
+
+1	"вишевая"
+2	"малиновая"
+3	"черниковая"
+10	"ягодная"
+4	"плодовая"
+*/
+
+-- 8 
+
