@@ -371,6 +371,8 @@ values
 ('плодовая');
 
 select * from public.test_serial;
+
+drop table public.test_serial;
 /*
 id    name
 
@@ -382,4 +384,94 @@ id    name
 */
 
 -- 8 
+create table public.test_serial 
+(
+	id serial primary key,
+    name text
+);
 
+insert into public.test_serial(name) -- добавляю улицу
+values('vishnevai');
+select * from public.test_serial;
+
+insert into public.test_serial(id, name) -- добавляю улицу с индексом
+values(2, 'yablochnay');
+select * from public.test_serial;
+
+insert into public.test_serial(name) 
+values('grushevay');
+-- ошибка, повторяющейся первичный ключ
+select * from public.test_serial;
+
+insert into public.test_serial(name) 
+values('grushevay');
+select * from public.test_serial;
+
+insert into public.test_serial(name) 
+values('zelenay');
+select * from public.test_serial;
+
+delete from public.test_serial where id=4; -- удаляю улицу
+select * from public.test_serial;
+
+insert into public.test_serial(name) -- получаю пропуск id под номером 4
+values('jultay');
+select * from public.test_serial;
+-- сериал распределяется последовательно!
+drop table public.test_serial
+
+-- 9
+/* в psql исп григорианский календарь */ 
+
+-- 10
+/* ограничение даты: 4713 до н. э - 294276 н. э. точность 1 микросек */ 
+
+-- 11
+/* зададим точность времени */
+select current_time::time;
+select '2016-12-31'::timestamp;
+select ('2016-12-31'::timestamp - '2016-12-21'::timestamp)::interval;
+
+select current_time::time(0);
+select '2016-12-31 08:34:29.663461'::timestamp(0);
+select ('2016-12-31 08:34:29.663461'::timestamp - '2016-12-21 08:24:25.451278'::timestamp)::interval(0);
+
+select current_time::time(3);
+select '2016-12-31 08:34:29.663461'::timestamp(3);
+select ('2016-12-31 08:34:29.663461'::timestamp - '2016-12-21 08:24:25.451278'::timestamp)::interval(3);
+/* у date точность 1 1 день */
+
+-- 12
+
+show datestyle; -- формат даты
+
+select '18-05-2016'::date;
+-- ВЫВОД: 2016-05-18
+select '18-05-2016 23:59:15.15'::timestamp;
+-- ВЫВОД: 2016-05-18 23:59:15.15
+
+select '05-18-2016'::date;
+-- ОШИБКА:  значение поля типа date/time вне диапазона: "05-18-2016"
+select '05-18-2016 23:59:15.15'::timestamp;
+-- ОШИБКА: значение поля типа date/time вне диапазона: "05-18-2016 23:59:15.15"
+
+set datestyle to 'MDY'; -- меняем формат ввода даты;
+
+select '18-05-2016'::date; -- ТЕПЕРЬ эта запись вызывает ошибку!!
+-- ОШИБКА:  значение поля типа date/time вне диапазона: "18-05-2016"
+
+select '05-18-2016'::date;
+-- ВЫВОД: 2016-05-18
+
+set datestyle to default; -- приводим в исходное ссотоние формат записи даты
+
+set datestyle to 'Postgres, MDY'; -- меняем формат ввода даты и iso на postgres;
+show datestyle; -- формат даты
+
+select '05-18-2016'::date;
+-- ВЫВОД: 05-18-2016 (не переставляет местами как iso)
+select '05-18-2016 23:59:15.15'::timestamp;
+-- ВЫВОД: Wed May 18 23:59:15.15 2016 
+
+set datestyle to default;
+/* так же есть форматы дат: iso, postgres, sql, german */
