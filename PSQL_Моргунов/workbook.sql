@@ -475,3 +475,103 @@ select '05-18-2016 23:59:15.15'::timestamp;
 
 set datestyle to default;
 /* так же есть форматы дат: iso, postgres, sql, german */
+
+-- 13
+-- 14
+
+-- 15
+/*преобразует время в текст to_char(timestamp, text) */
+select to_char(current_timestamp, 'mi:ss');
+select to_char(current_timestamp, 'dd');
+select to_char(current_timestamp, 'yyyy-mm-dd');
+
+-- 16 
+select 'feb 30, 2016'::date;
+/* недопустимое значение  */ 
+
+-- 17 
+select '01:61:45.51'::time;
+/* недопустимое значение  */ 
+
+-- 18
+select ('2016-12-31'::date - '2016-12-21'::date);
+-- формат integer а не interval 
+
+-- 19 
+select ('11:59:45'::time - '11:49:45'::time);
+-- формат interval
+
+select ('11:59:45'::time + '11:49:45'::time);
+-- ОШИБКА:  оператор не уникален:
+
+-- 20 
+select (current_timestamp - '2016-12-31 23:59:56.45'::timestamp);
+-- формат interval
+
+select (current_timestamp + '1 mon'::interval);
+-- формат timestampЮ прибавляет 1 месяц к дате
+
+-- 21
+select ('2016-01-31'::date + '1 mon'::interval);
+-- в итоге полчается послдений день ферваля
+select ('2016-02-29'::date + '1 mon'::interval);
+-- а тут 29 марта
+
+-- 22
+/* стиль ввода интервала */
+show intervalstyle;
+et intervalstyle to ( postgres_verbose, sql_standard )
+set intervalstyle to default
+
+-- 23
+select ('2016-12-31'::date - '2016-12-21'::date);
+-- тут получится чилсло в фрмате integer
+
+select ('2016-12-31'::timestamp - '2016-12-21'::timestamp);
+-- тут получится интервал в фрмате interval
+
+-- 24
+select ('20:59:45'::time - 1);
+-- выдает ошибку ('1 h'::interval а вот так работает)
+
+select ('2016-12-31'::date - 1);
+-- выичтает 1 день
+
+-- 25
+/* усечение */
+select date_trunc('sec', '2016-12-31 23:59:15.15'::timestamp); 
+
+select date_trunc('week', '2016-12-31 23:59:15.15'::timestamp); 
+-- вывод:  2016-12-26 00:00:00
+
+-- 26
+/* усечение */
+select date_trunc('hour', '23:59:15.15'::interval)
+
+-- 27
+/* извлечение */
+select extract('sec' from '2016-12-31 23:59:15.15'::timestamp);
+-- формат numeric 
+
+-- 28
+/* извлечение */
+select extract('minute' from '23:59:15.15'::interval)
+-- формат numeric 
+
+-- 29 
+	create table public.test 
+	(is_open_source boolean, 
+	db_name text);
+	
+	insert into public.test 
+	values(true, 'psql'),
+		  (false, 'orac'),
+		  (true, 'mysql'),
+		  (false, 'mysql server');
+		  
+/* проверим равнозначность команд */
+select * from public.test where not is_open_source; 
+select * from public.test where is_open_source <> 'yes';
+select * from public.test where is_open_source <> 't';
+select * from public.test where is_open_source <> '1';
+select * from public.test where is_open_source <> 1; -- ВЫДАЁТ ОШИБКУ boolean <> integer
