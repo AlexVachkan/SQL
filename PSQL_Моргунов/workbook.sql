@@ -567,7 +567,7 @@ select extract('minute' from '23:59:15.15'::interval)
 	values(true, 'psql'),
 		  (false, 'orac'),
 		  (true, 'mysql'),
-		  (false, 'mysql server');
+		  (false, 'mysql server'); 
 		  
 /* проверим равнозначность команд */
 select * from public.test where not is_open_source; 
@@ -575,3 +575,251 @@ select * from public.test where is_open_source <> 'yes';
 select * from public.test where is_open_source <> 't';
 select * from public.test where is_open_source <> '1';
 select * from public.test where is_open_source <> 1; -- ВЫДАЁТ ОШИБКУ boolean <> integer
+
+drop table public.test;
+
+-- 30
+create table public.test
+(
+	a boolean,
+	b text
+)
+
+INSERT INTO public.test VALUES ( TRUE, 'yes' );
+INSERT INTO public.test VALUES ( yes, 'yes' );  --  столбец "yes" не существует   
+INSERT INTO public.test VALUES ( 'yes', true );
+INSERT INTO public.test VALUES ( 'yes', TRUE );
+INSERT INTO public.test VALUES ( '1', 'true' );
+INSERT INTO public.test VALUES ( 1, 'true' ); -- столбец "a" имеет тип boolean, а выражение - integer
+INSERT INTO public.test VALUES ( 't', 'true' );
+INSERT INTO public.test VALUES ( 't', truth ); -- столбец "truth" не существует
+INSERT INTO public.test VALUES ( true, true );
+INSERT INTO public.test VALUES ( 1::boolean, 'true' );
+INSERT INTO public.test VALUES ( 111::boolean, 'true' );
+
+select * from public.test;
+
+drop table public.test;
+
+-- 31 
+create table public.test
+(person text not null,
+birthday date not null);
+
+insert into public.test values ('Ken Thompson', '1955-03-23');
+insert into public.test values ('Ben Johnson', '1971-03-19');
+insert into public.test values ('Andy Gibson', '1987-08-12');
+
+select * from public.test;
+
+select * from public.test
+where extract('mon' from birthday) = 3; 
+
+/* кому на данный момент 40*/ 
+select *, birthday + '40 years'::interval as years_40
+from public.test
+where birthday + '40 years'::interval < current_timestamp;
+
+select *, birthday + '40 years'::interval as years_40
+from public.test
+where birthday + '40 years'::interval < current_date;
+
+/* точный возраст каждого человека */
+select *, 
+(current_timestamp - birthday::timestamp) as days,  -- интервал с форматом date не работает!
+age(birthday::timestamp)  
+from public.test;
+
+drop table public.test;
+
+-- 32 
+SELECT array_cat( ARRAY[ 1, 2, 3 ], ARRAY[ 3, 5 ] );
+SELECT array_append( ARRAY[ 1, 2, 3 ], 5 );
+
+SELECT array_remove( ARRAY[ 1, 2, 3 ], 3 );
+
+/* https://postgrespro.ru/docs/postgresql/15/functions-array */ 
+
+-- 33
+CREATE TABLE public.test
+( pilot_name text,
+schedule integer[],
+meal text[]
+);
+
+INSERT INTO public.test
+VALUES ( 'Ivan', '{ 1, 3, 5, 6, 7 }'::integer[],
+'{ "сосиска", "макароны", "кофе" }'::text[]
+),
+( 'Petr', '{ 1, 2, 5, 7 }'::integer [],
+'{ "котлета", "каша", "кофе" }'::text[]
+),
+( 'Pavel', '{ 2, 5 }'::integer[],
+'{ "сосиска", "каша", "кофе" }'::text[]
+),
+( 'Boris', '{ 3, 5, 6 }'::integer[],
+'{ "котлета", "каша", "чай" }'::text[]
+);
+
+select * from public.test;
+
+select * from public.test
+where meal[1]='сосиска';
+
+drop table public.test;
+
+/* создать таблицу с двумерным массивом */ 
+CREATE TABLE public.test
+( pilot_name text,
+schedule integer[],
+meal text[]
+);
+
+INSERT INTO public.test
+VALUES ( 'Ivan', '{ 1, 3, 5, 6, 7 }'::integer[],
+'{ 
+	{ "сосиска", "макароны", "кофе" },
+	{ "котлета", "каша", "кофе" },
+	{ "сосиска", "каша", "кофе" },
+	{ "котлета", "каша", "чай" }  
+}'::text[][]
+),
+( 'Petr', '{ 1, 2, 5, 7 }'::integer [],
+'{ 
+	{ "сосиска", "макароны", "кофе" },
+	{ "котлета", "каша", "кофе" },
+	{ "сосиска", "каша", "кофе" },
+	{ "котлета", "каша", "чай" }  
+}'::text[][]
+),
+( 'Pavel', '{ 2, 5 }'::integer[],
+'{ 
+	{ "сосиска", "макароны", "кофе" },
+	{ "котлета", "каша", "кофе" },
+	{ "сосиска", "каша", "кофе" },
+	{ "котлета", "каша", "чай" }  
+}'::text[][]
+),
+( 'Boris', '{ 3, 5, 6 }'::integer[],
+'{ 
+	{ "сосиска", "макароны", "кофе" },
+	{ "котлета", "каша", "кофе" },
+	{ "сосиска", "каша", "кофе" },
+	{ "котлета", "каша", "чай" }  
+}'::text[][]
+);
+
+select * from public.test;
+
+select * from public.test
+where meal[1][1]='сосиска';
+
+drop table public.test;
+
+-- 34 
+
+CREATE TABLE public.test
+	(name text,
+	hobbi jsonb);
+
+
+INSERT INTO public.test
+	VALUES ( 'Ivan',
+	'{ "sports": [ "футбол", "плавание" ],
+	"home_lib": true, "trips": 3
+	}'::jsonb
+	),
+	( 'Petr',
+	'{ "sports": [ "теннис", "плавание" ],
+	"home_lib": true, "trips": 2
+	}'::jsonb
+	),
+	( 'Pavel',
+	'{ "sports": [ "плавание" ],
+	"home_lib": false, "trips": 4
+	}'::jsonb
+	),
+	( 'Boris',
+	'{ "sports": [ "футбол", "плавание", "теннис" ],
+	"home_lib": true, "trips": 0
+	}'::jsonb
+	);
+	
+select *
+from public.test;
+	
+	
+/*Замена значений в json */
+UPDATE public.test
+SET hobbi = jsonb_set( hobbi, '{ trips }', '10' )
+WHERE name = 'Pavel';
+
+/*Разворачиваем json */
+SELECT name, hobbi->'trips' AS trips FROM public.test;
+
+/* изменения по ключу home_lib*/
+update public.test
+set hobbi = jsonb_set( hobbi, '{ home_lib }', 'true');
+
+select name, hobbi -> 'home_lib' as home_lib 
+from public.test;
+
+drop table public.test;
+
+-- 35
+SELECT '{ "sports": "хоккей" }'::jsonb || '{ "trips": 5 }'::jsonb;
+
+/* https://postgrespro.ru/docs/postgresql/15/functions-json */ 
+
+-- 36 
+CREATE TABLE public.test
+	(name text,
+	hobbi jsonb);
+
+
+INSERT INTO public.test
+	VALUES ( 'Ivan',
+	'{ "sports": [ "футбол", "плавание" ],
+	"home_lib": true, "trips": 3
+	}'::jsonb
+	),
+	( 'Petr',
+	'{ "sports": [ "теннис", "плавание" ],
+	"home_lib": true, "trips": 2
+	}'::jsonb
+	),
+	( 'Pavel',
+	'{ "sports": [ "плавание" ],
+	"home_lib": false, "trips": 4
+	}'::jsonb
+	),
+	( 'Boris',
+	'{ "sports": [ "футбол", "плавание", "теннис" ],
+	"home_lib": true, "trips": 0
+	}'::jsonb
+	);
+	
+select *
+from public.test;
+
+insert into public.test
+values
+('Gosha', 
+'{"sports": "tennis"}'::jsonb||
+'{"trips": 15}'::jsonb ||
+'{"home_lib": false}'::jsonb);
+ 
+select *
+from public.test;
+
+-- 37 
+select '{"a": "b", "c": "d"}'::jsonb - 'a';
+-- ОТВЕТ: {"c": "d"}
+
+update public.test
+set name = name - 'Boris'; -- ?? не понял как с помощью оператора - удалить ключ ??
+
+drop table public.test
+ 
+-- ГЛАВА 5 
+ 
