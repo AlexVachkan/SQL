@@ -857,20 +857,62 @@ insert into public.test values
 
 select * from public.test;
 
-psql: \d public.test -- структура таблицы
-/* 
-Таблица "public.test"
- Столбец |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию
----------+--------------+--------------------+-------------------+--------------
- term    | numeric(1,0) |                    |                   |
- mark    | numeric(1,0) |                    |                   |
-Ограничения-проверки:
-    "valid_mark" CHECK (mark >= 3::numeric AND mark <= 5::numeric)
-    "valid_term" CHECK (term = 1::numeric OR term = 2::numeric)
-*/
+psql: \d public.test; -- структура таблицы
+		/* 
+		Таблица "public.test"
+		 Столбец |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию
+		---------+--------------+--------------------+-------------------+--------------
+		 term    | numeric(1,0) |                    |                   |
+		 mark    | numeric(1,0) |                    |                   |
+		Ограничения-проверки:
+			"valid_mark" CHECK (mark >= 3::numeric AND mark <= 5::numeric)
+			"valid_term" CHECK (term = 1::numeric OR term = 2::numeric)
+		*/
 
-drop table public.test
+drop table public.test;
 
+/* NOT NULL */ 
+-- или CHECK ( column_name IS NOT NULL) 
+create table public.test
+( 
+	term numeric( 1 ) not null
+);
 
+insert into public.test values
+(1),
+(5);
 
+psql: \d public.test; -- структура таблицы
+		/* 
+		Таблица "public.test"
+		 Столбец |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию
+		---------+--------------+--------------------+-------------------+--------------
+		 term    | numeric(1,0) |                    | not null          |
+		*/
+drop table public.test;
  
+/* unique */ 
+-- все значения в стобце уникальные
+CREATE TABLE public.test
+( 
+	doc_ser numeric( 4 ),
+	doc_num numeric( 6 ),
+	CONSTRAINT unique_passport UNIQUE ( doc_ser, doc_num )
+);
+
+psql: \d public.test; -- структура таблицы
+		/* 
+		Таблица "public.test"
+		 Столбец |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию		
+		---------+--------------+--------------------+-------------------+--------------		
+		 doc_ser | numeric(4,0) |                    |                   |					   
+		 doc_num | numeric(6,0) |                    |                   |					   
+		Индексы:
+			"unique_passport" UNIQUE CONSTRAINT, btree (do
+		c_ser, doc_num)
+		*/
+drop table public.test;
+
+/* первичный ключ */
+-- первичный ключ = unique + not null
+
