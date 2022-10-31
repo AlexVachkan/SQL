@@ -822,4 +822,55 @@ set name = name - 'Boris'; -- ?? не понял как с помощью опе
 drop table public.test
  
 -- ГЛАВА 5 
+
+/* DEFAULT */
+-- Значение по умолчанию, если его нет, то заполняется таблица null
+create table public.test
+( 
+	name text not null,
+	number numeric(2) default 25,
+	text text default 'ok',
+	number serial -- равно: integer DEFAULT nextval('products_product_no_seq') 
+);
+
+insert into public.test values
+('igor'),
+('stas');
+
+select * from public.test;
+
+drop table public.test
+
+/* CHECK */ 
+-- ограничения-проверки 
+create table public.test
+( 
+	term numeric( 1 ), --CHECK ( term = 1 OR term = 2 ), Так дает имя ограничению автоматичсеки
+	CONSTRAINT valid_term CHECK ( term = 1 OR term = 2 ), -- А так мы сами имя ограничения назначем
+    mark numeric( 1 ), -- CHECK ( mark >= 3 AND mark <= 5 ),
+	CONSTRAINT valid_mark CHECK ( mark >= 3 AND mark <= 5 )
+);
+
+insert into public.test values
+(1,5),
+(2,4);
+
+select * from public.test;
+
+psql: \d public.test -- структура таблицы
+/* 
+Таблица "public.test"
+ Столбец |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию
+---------+--------------+--------------------+-------------------+--------------
+ term    | numeric(1,0) |                    |                   |
+ mark    | numeric(1,0) |                    |                   |
+Ограничения-проверки:
+    "valid_mark" CHECK (mark >= 3::numeric AND mark <= 5::numeric)
+    "valid_term" CHECK (term = 1::numeric OR term = 2::numeric)
+*/
+
+drop table public.test
+
+
+
  
