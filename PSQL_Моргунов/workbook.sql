@@ -913,6 +913,149 @@ psql: \d public.test; -- структура таблицы
 		*/
 drop table public.test;
 
-/* первичный ключ */
+/* первичный ключ(primary key) */
 -- первичный ключ = unique + not null
+create table public.test 
+(
+	number_count numeric(5) primary key, -- задание первичного ключа (вар 1)
+    ...
+)
 
+create table public.test 
+(
+	number_count numeric(5), -- задание первичного ключа (вар 2)
+	primary key ( number_count )
+    ...
+)
+
+--составной первичный ключ
+...
+primary key ( col_name_1, col_name_2 )
+...
+
+/* внешний ключ(foreign key) */
+
+-- поддержание ссылочной целостности
+/* 
+ссылочная таблица - студенты
+ссылающаяся таблица - предметы
+*/
+create table test
+(
+	predmet text references students( student_id ), -- создать внешний ключ в виде ограничения
+	...
+) -- нельзя в test.predmet внести строку которой нет в students.student_id
+
+-- если внешний ключ ссылается на первичный то запись:
+create table test
+(
+	predmet text references students, 
+	...
+);
+
+-- можно так же записать как ограничение
+create table test
+(
+	predmet text,
+	... ,
+	foreign key ( predmet )
+		references students ( students_id )
+);
+
+-- каскадное удаление
+create table test
+(
+	predmet text,
+	... ,
+	foreign key ( predmet )
+	    references students ( student_id )
+	    on cascade delete
+);
+
+-- запрет удаления если есть данные в ссылающейся таблице
+create table test
+(
+	predmet text,
+	... ,
+	foreign key ( predmet )
+	    references students ( student_id )
+	    on delete restrict
+);
+
+       /* ИЛИ */
+	   
+create table test
+(
+	predmet text,
+	... ,
+	foreign key ( predmet )
+	    references students ( student_id )
+);
+
+-- присваивание атрибутам внешнего ключа NULL
+create table test
+(
+	predmet text, -- отсутсвует огранчение not null!
+	... ,
+	foreign key ( predmet )
+	    references students ( students_id )
+	    on delete set null
+);
+
+-- присваивание атрибутам внешнего ключа default(автоматом null)
+create table test
+(
+	predmet text, -- отсутсвует огранчение not null!
+	... ,
+	foreign key ( predmet )
+	    references students ( students_id )
+	    on delete set default
+);
+
+-- при выполенение update
+create table test
+(
+	predmet text, -- отсутсвует огранчение not null!
+	... ,
+	foreign key ( predmet )
+	    references students ( students_id )
+	    on update cascade
+);
+	   
+-- СОЗДАДИМ теперь самостоятельно таблицу студенты и успеваемость
+
+-- создадим базу данных
+create database univer;
+
+-- подключимся к ней
+\connect database univer; -- в psql
+
+-- создадим таблицу students
+create table public.students
+(
+	record_book numeric(5) not null,
+	name text not null,
+	doc_ser numeric(4),
+	doc_num numeric(6),
+	primary key ( record_book )
+);
+
+-- создадим таблицу  progress
+create table public.progress
+(
+	record_book numeric(5) not null,
+	subject text not null,
+	acad_year text not null,
+	term numeric(1) not null check (term=1 or term=2),
+	mark numeric(1) not null check (mark<=3 and mark<=5)
+		default 5,
+	foreign key ( record_book ) 
+		references public.students (record_book)
+		on delete cascade
+		on update cascade
+);
+
+-- удаляем все это!	   
+DROP DATABASE univer;
+DROP table public.students;
+DROP table public.progress;
