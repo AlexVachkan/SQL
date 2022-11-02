@@ -1067,81 +1067,27 @@ SET search_path TO bookings;
 -- подключится к базе
 \connect demo -- \c demo
 
--- сначала создаются ссылочные таблицы, потом ссылающиеся
-/*
-demo=# \d airports_data
-                          Таблица "bookings.airports_data"
-   Столбец    |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию
---------------+--------------+--------------------+-------------------+--------------
- airport_code | character(3) |                    | not null          |
- airport_name | jsonb        |                    | not null          |
- city         | jsonb        |                    | not null          |
- coordinates  | point        |                    | not null          |
- timezone     | text         |                    | not null          |
-Индексы:
-    "airports_data_pkey" PRIMARY KEY, btree (airport_code)
-Ссылки извне:
-    TABLE "flights" CONSTRAINT "flights_arrival_airport_fkey" FOREIGN KEY (arrival_airport)
- REFERENCES airports_data(airport_code)
-    TABLE "flights" CONSTRAINT "flights_departure_airport_fkey" FOREIGN KEY (departure_airp
-ort) REFERENCES airports_data(airport_code)
-*/
-
-/*
-Создать комментрации к столбцу
+-- Добавляем комментарий  к столбцу
 COMMENT ON COLUMN airports.city IS 'Город';
 
-Что бы увидеть комментарии  к столбцым:
-                                                                   Таблица "bookings.airports_data"
-   Столбец    |     Тип      | Правило сортировки | Допустимость NULL | По умолчанию | Хранилище | Сжатие | Цель для статистики |                   Описание
---------------+--------------+--------------------+-------------------+--------------+-----------+--------+---------------------+----------------------------------------------
- airport_code | character(3) |                    | not null          |              | extended  |        |                     | Airport code
- airport_name | jsonb        |                    | not null          |              | extended  |        |                     | Airport name
- city         | jsonb        |                    | not null          |              | extended  |        |                     | City
- coordinates  | point        |                    | not null          |              | plain     |        |                     | Airport coordinates (longitude and latitude)
- timezone     | text         |                    | not null          |              | extended  |        |                     | Airport time zone
-Индексы:
-    "airports_data_pkey" PRIMARY KEY, btree (airport_code)
-Ссылки извне:
-    TABLE "flights" CONSTRAINT "flights_arrival_airport_fkey" FOREIGN KEY (arrival_airport) REFERENCES airports_data(airport_code)
-    TABLE "flights" CONSTRAINT "flights_departure_airport_fkey" FOREIGN KEY (departure_airport) REFERENCES airports_data(airport_code)
-Метод доступа: heap
-*/
+-- Удвление по каскадной схеме
+DROP TABLE aircrafts CASCADE;
 
-/* 
-Рассмотрим таблицу flight
+-- Пропускаем удаленные таблицы, и удаляет другие по связям
+DROP TABLE IF EXISTS aircrafts CASCADE;
 
-demo=# \d flights
-                                                      Таблица "bookings.flights"
-       Столбец       |           Тип            | Правило сортировки | Допустимость NULL |                По умолчанию
----------------------+--------------------------+--------------------+-------------------+--------------------------------------------
- flight_id           | integer                  |                    | not null          | nextval('flights_flight_id_seq'::regclass)
- flight_no           | character(6)             |                    | not null          |
- scheduled_departure | timestamp with time zone |                    | not null          |
- scheduled_arrival   | timestamp with time zone |                    | not null          |
- departure_airport   | character(3)             |                    | not null          |
- arrival_airport     | character(3)             |                    | not null          |
- status              | character varying(20)    |                    | not null          |
- aircraft_code       | character(3)             |                    | not null          |
- actual_departure    | timestamp with time zone |                    |                   |
- actual_arrival      | timestamp with time zone |                    |                   |
-Индексы:
-    "flights_pkey" PRIMARY KEY, btree (flight_id)
-    "flights_flight_no_scheduled_departure_key" UNIQUE CONSTRAINT, btree (flight_no, scheduled_departure)
-Ограничения-проверки:
-    "flights_check" CHECK (scheduled_arrival > scheduled_departure)
-    "flights_check1" CHECK (actual_arrival IS NULL OR actual_departure IS NOT NULL AND actual_arrival IS NOT NULL AND actual_arrival > actual_departure)
-    "flights_status_check" CHECK (status::text = ANY (ARRAY['On Time'::character varying::text, 'Delayed'::character varying::text, 'Departed'::character varying::text, 'Arrived'::charact
-er varying::text, 'Scheduled'::character varying::text, 'Cancelled'::character varying::text]))
-Ограничения внешнего ключа:
-    "flights_aircraft_code_fkey" FOREIGN KEY (aircraft_code) REFERENCES aircrafts_data(aircraft_code)
-    "flights_arrival_airport_fkey" FOREIGN KEY (arrival_airport) REFERENCES airports_data(airport_code)
-    "flights_departure_airport_fkey" FOREIGN KEY (departure_airport) REFERENCES airports_data(airport_code)
-Ссылки извне:
-    TABLE "ticket_flights" CONSTRAINT "ticket_flights_flight_id_fkey" FOREIGN KEY (flight_id) REFERENCES flights(flight_id)	
-	
-	
-flight_id - суррогатный ключ, для перечисления строк!
-*/
+-- ПРИМЕРЫ СОЗДАНИЯ ТАБЛИЦ ПРИВЕДЕНЫ В КНИГЕ, СЮДА ИХ КОПИРОВАТЬ НЕ БУДЕМ!
+
+-- Модификация таблиц
+ALTER TABLE table ADD COLUMN ... -- или DROP COLUMN, ADD CHECK, ADD CONSTRAINT
+
+-- Пример
+alter table aircrafts 
+	add column speed integer not null check ( speed >= 300 );
+-- выдаст ошибку так как в таблице уже были строки других атрибутов
+-- РЕШЕНИЕ
+alter table aircrafts add column speed integer; -- добавляем атрибут
+
+
 
 
