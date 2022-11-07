@@ -1078,16 +1078,74 @@ DROP TABLE IF EXISTS aircrafts CASCADE;
 
 -- ПРИМЕРЫ СОЗДАНИЯ ТАБЛИЦ ПРИВЕДЕНЫ В КНИГЕ, СЮДА ИХ КОПИРОВАТЬ НЕ БУДЕМ!
 
--- Модификация таблиц
+-- МОДИФИКАЦИЯ ТАБЛИЦ
 ALTER TABLE table ADD COLUMN ... -- или DROP COLUMN, ADD CHECK, ADD CONSTRAINT
 
 -- Пример
 alter table aircrafts 
 	add column speed integer not null check ( speed >= 300 );
 -- выдаст ошибку так как в таблице уже были строки других атрибутов
+
 -- РЕШЕНИЕ
 alter table aircrafts add column speed integer; -- добавляем атрибут
+-- ???
+alter table test alter column speed drop not null; -- удаляем ограничение
+alter table test drop constraint test_speed_check; -- удаляем ограничение
 
+\d aircrafts_data; -- что бы выяснить ограничения
 
+-- ИЗМЕНЕНИЕ ТИПА ДАННЫХ 
+alter table test
+	alter column speed set data type numeric(5,2),
+	alter column weihgt set data type numeric(5,2);
 
+-- меняет текстовый формат на числовой
+ALTER TABLE seats 
+	DROP CONSTRAINT seats_fare_conditions_check, -- удаляем органичение
+	ALTER COLUMN fare_conditions SET DATA TYPE integer
+		USING ( CASE WHEN fare_conditions = 'Economy' THEN 1
+					WHEN fare_conditions = 'Business' THEN 2
+					ELSE 3 END
+			);
+
+-- добавляем внешний ключ
+ALTER TABLE seats
+	ADD FOREIGN KEY ( fare_conditions )
+		REFERENCES fare_conditions ( fare_conditions_code );
+		
+-- переименнуем столбец
+ALTER TABLE seats
+	RENAME COLUMN fare_conditions TO fare_conditions_code;
+
+-- переименнуем ограничение
+ALTER TABLE seats
+	RENAME CONSTRAINT seats_fare_conditions_fkey
+	TO seats_fare_conditions_code_fkey;
+	
+-- ПРЕДСТАВЛЕНИЯ
+-- что бы не выполнять один и теже запросы, можно сохранить их в представления
+create view bookings.test_view as 
+	select count(aircraft_code)
+	from aircrafts_data;
+	
+select *
+from bookings.test_view;
+
+\x -- psql отключение расширенного просмотра
+
+DROP VIEW IF EXISTS flights_v; -- исключение ошибок при удаление представления
+
+-- материализованное представление(сохраняет с данными) 
+create materialized view bookings.test_mat_view as 
+	select count(aircraft_code)
+	from aircrafts_data
+	WITH NO DATA; -- записываю его без даннных
+	
+REFRESH MATERIALIZED VIEW bookings.test_mat_view; -- обновляю данные
+	
+select *
+from bookings.test_mat_view;
+
+drop view bookings.test_view;
+drop materialized view bookings.test_mat_view;
 
