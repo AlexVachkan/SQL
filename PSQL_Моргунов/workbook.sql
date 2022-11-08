@@ -1149,3 +1149,116 @@ from bookings.test_mat_view;
 drop view bookings.test_view;
 drop materialized view bookings.test_mat_view;
 
+-- СХЕМА БАЗЫ ДАННЫХ
+psql: \dn -- просмотр схем БД
+SET search_path = bookings; -- организация доступа к схеме т.е. вместо (SELECT * FROM bookings.aircrafts;)
+
+SHOW search_path; -- посмотреть значения
+
+SELECT current_schema; -- узнать имя текущей схемы
+
+-- Контрольные вопросы и задания
+-- 1 
+CREATE TABLE students
+( record_book numeric( 5 ) NOT NULL,
+  name text NOT NULL,
+  doc_ser numeric( 4 ),
+  doc_num numeric( 6 ),
+  who_adds_row text DEFAULT current_user, -- добавленный столбец
+  PRIMARY KEY ( record_book )
+);
+
+select *
+from students;
+
+alter table students
+	add column add_time timestamp default current_timestamp;
+	
+insert into students (record_book, name, doc_ser, doc_num) values
+(1, 'rob', 1, 1),
+(2, 'bob', 2, 2);
+
+/*
+1	"rob"	1	1	"postgres"	"2022-11-08 10:32:05.386342"
+2	"bob"	2	2	"postgres"	"2022-11-08 10:32:05.386342"
+*/
+DROP TABLE students;
+
+-- 2
+create table progress
+(
+	record_book numeric(5) not null,
+	subject text not null,
+	acad_year text not null,
+	term numeric(1) not null check (term=1 or term=2),
+	mark numeric(1) not null check (mark<=3 and mark<=5)
+		default 5,
+	foreign key ( record_book ) 
+		references students (record_book)
+		on delete cascade
+		on update cascade
+);
+
+alter table progress
+	add column test_form text not null,
+	add check (
+		test_form = 'экзамен' and mark in (3,4,5)
+		or
+		test_form = 'зачет' and mark in (0,1)
+		);
+
+select * from progress;
+
+insert into progress 
+values
+(1, 'bob', 'text', 1, 3, 'экзамен');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
