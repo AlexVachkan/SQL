@@ -1191,7 +1191,7 @@ create table progress
 	subject text not null,
 	acad_year text not null,
 	term numeric(1) not null check (term=1 or term=2),
-	mark numeric(1) not null check (mark<=3 and mark<=5)
+	mark numeric(1) not null check (mark>=3 and mark<=5)
 		default 5,
 	foreign key ( record_book ) 
 		references students (record_book)
@@ -1204,17 +1204,47 @@ alter table progress
 	add check (
 		test_form = 'экзамен' and mark in (3,4,5)
 		or
-		test_form = 'зачет' and mark in (0,1)
+		test_form = 'зачет' and term in (0,1)
 		);
 
 select * from progress;
 
-insert into progress 
-values
-(1, 'bob', 'text', 1, 3, 'экзамен');
+insert into students (record_book, name, doc_ser, doc_num) values
+(1, 'rob', 1, 1),
+(2, 'bob', 2, 2);
 
+DROP TABLE students;
+DROP TABLE progress;
 
+-- ГЛАВА 6
 
+-- SELECT
+select * from aircrafts;
+select * from airports;
+
+SELECT * FROM aircrafts WHERE model LIKE 'Airbus%'; -- начинеатся на Airbus
+
+SELECT * FROM airports WHERE airport_name LIKE '___'; -- слово из трех букв
+
+-- регулярными выражениями POSIX
+
+SELECT * FROM aircrafts WHERE model ~ '^(A|Boe)';
+-- ~ ищет совпадение с шаблоном
+-- ^ в начале строки
+-- \ начлие слова в составе строки
+-- (A|Boe) альтернативный выбор
+-- !~ (300$) конец строки 
+-- $ привязка поиского шаблона к концу строки 
+
+SELECT * FROM aircrafts WHERE range BETWEEN 3000 AND 6000; -- между диапозоном
+
+SELECT model, range, round( range / 1.609, 2 ) AS miles
+	FROM aircrafts; -- перевод в мили
+	
+SELECT * FROM aircrafts ORDER BY range DESC; -- сортировка от большего к меньшему
+
+-- distinct невоторяющиеся значения и к столбцу обраились по порядковому номеру!
+SELECT DISTINCT timezone FROM airports ORDER BY 1; 
 
 
 
