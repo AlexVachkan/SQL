@@ -1246,31 +1246,205 @@ SELECT * FROM aircrafts ORDER BY range DESC; -- сортировка от бол
 -- distinct невоторяющиеся значения и к столбцу обраились по порядковому номеру!
 SELECT DISTINCT timezone FROM airports ORDER BY 1; 
 
+-- limit и offset
+SELECT airport_name, city, longitude
+FROM airports
+ORDER BY longitude DESC
+LIMIT 3 -- оставляем три записи
+OFFSET 3; -- пропускаем первые три записи
 
+-- case when end 
+SELECT model, range,
+  CASE 
+	WHEN range < 2000 THEN 'Ближнемагистральный'
+	WHEN range < 5000 THEN 'Среднемагистральный'
+	ELSE 'Дальнемагистральный'
+  END AS type
+FROM aircrafts
+ORDER BY model;
 
+-- СОЕДИНЕНИЯ 
+-- inner join-внуто соед, left join, right join, full outer join-внешнее соед
+SELECT s.seat_no, s.fare_conditions
+FROM seats s
+JOIN aircrafts a ON s.aircraft_code = a.aircraft_code
+WHERE a.model ~ '^Cessna'
+ORDER BY s.seat_no;
 
+-- тоже самое 
+SELECT a.aircraft_code, a.model, s.seat_no, s.fare_conditions
+FROM seats s, aircrafts a
+WHERE s.aircraft_code = a.aircraft_code
+AND a.model ~ '^Cessna'
+ORDER BY s.seat_no;
 
+-- пример запроса
+SELECT r.min_sum, r.max_sum, count( b.* )
+FROM bookings b
+RIGHT OUTER JOIN
+( VALUES ( 0, 100000 ), ( 100000, 200000 ), -- создаем виртуальную таблицу
+( 200000, 300000 ), ( 300000, 400000 ),
+( 400000, 500000 ), ( 500000, 600000 ),
+( 600000, 700000 ), ( 700000, 800000 ),
+( 800000, 900000 ), ( 900000, 1000000 ),
+( 1000000, 1100000 ), ( 1100000, 1200000 ),
+( 1200000, 1300000 )
+) AS r ( min_sum, max_sum )
+ON b.total_amount >= r.min_sum AND b.total_amount < r.max_sum
+GROUP BY r.min_sum, r.max_sum
+ORDER BY r.min_sum;
 
+-- UNION для вычисления объединения множеств строк из двух выборок;
+SELECT arrival_city FROM routes
+WHERE departure_city = 'Москва'
+UNION
+SELECT arrival_city FROM routes
+WHERE departure_city = 'Санкт-Петербург'
+ORDER BY arrival_city;
 
+-- INTERSECT для вычисления пересечения множеств строк из двух выборок;
+SELECT arrival_city FROM routes
+WHERE departure_city = 'Москва'
+INTERSECT
+SELECT arrival_city FROM routes
+WHERE departure_city = 'Санкт-Петербург'
+ORDER BY arrival_city;
 
+-- EXCEPT для вычисления разности множеств строк из двух выборок.
+SELECT arrival_city FROM routes
+WHERE departure_city = 'Санкт-Петербург'
+EXCEPT
+SELECT arrival_city FROM routes
+WHERE departure_city = 'Москва'
+ORDER BY arrival_city;
 
+-- АГРЕГИРОВАНИЕ И ГРУППИРОВКА
 
+-- avg(), min(), max(), count(*)
+-- HAVING — уже после выполнения группировки
 
+-- ОКОННЫЕ ФУНКЦИИ
 
+count( * ) OVER ( -- оконная функция
+PARTITION BY date_trunc( 'month', b.book_date ) -- правило разбиение строк
+ORDER BY b.book_date
+) AS count
 
+SELECT airport_name, city, timezone, latitude,
+first_value( latitude ) OVER tz AS first_in_timezone,
+latitude - first_value( latitude ) OVER tz AS delta,
+rank() OVER tz
+FROM airports
+WHERE timezone IN ( 'Asia/Irkutsk', 'Asia/Krasnoyarsk' )
+WINDOW tz AS ( PARTITION BY timezone ORDER BY latitude DESC )
+ORDER BY timezone, rank;
 
+-- ПОДЗАПРОСЫ
+-- SELECT, FROM, WHERE и HAVING, WITH - можно испол подзапросы
 
+SELECT count( * ) FROM bookings
+WHERE total_amount > -- или in что бы проверить принадлежность
+( SELECT avg( total_amount ) FROM bookings );
 
+-- определить факт наличия используем exsist
+SELECT DISTINCT a.city
+FROM airports a
+WHERE NOT EXISTS (
+SELECT * FROM routes r
+WHERE r.departure_city = 'Москва'
+AND r.arrival_city = a.city
+)
+AND a.city <> 'Москва'
+ORDER BY city;
 
+-- использование  string_agg
+SELECT s2.model,
+string_agg(
+s2.fare_conditions || ' (' || s2.num || ')',
+', '
+)
+FROM (
+SELECT a.model,
+s.fare_conditions,
+count( * ) AS num
+FROM aircrafts a
+JOIN seats s ON a.aircraft_code = s.aircraft_code
+GROUP BY 1, 2
+ORDER BY 1, 2
+) AS s2
+GROUP BY s2.model
+ORDER BY s2.model;
+/* 
+Подзапрос формирует временную таблицу в таком виде:
+model | fare_conditions | num
+---------------------+-----------------+-----
+Airbus A319-100 | Business | 20
+Airbus A319-100 | Economy | 96
+...
+Sukhoi SuperJet-100 | Business | 12
+Sukhoi SuperJet-100 | Economy | 85
+(17 строк)
+А в главном (внешнем) запросе используется агрегатная функция string_agg 
+model | string_agg
+---------------------+--------------------------------------------
+Airbus A319-100 | Business (20), Economy (96)
+Airbus A320-200 | Business (20), Economy (120)
+Airbus A321-200 | Business (28), Economy (142)
+Boeing 737-300 | Business (12), Economy (118)
+Boeing 767-300 | Business (30), Economy (192)
+Boeing 777-300 | Business (30), Comfort (48), Economy (324)
+Bombardier CRJ-200 | Economy (50)
+Cessna 208 Caravan | Economy (12)
+Sukhoi SuperJet-100 | Business (12), Economy (85)
+(9 строк)
+*/
 
+-- общее табличное выражение (Common Table Expression — CTE).
+-- испол констр WITH ts AS (...)
+WITH ts AS
+( SELECT f.flight_id,
+f.flight_no,
+f.scheduled_departure_local,
+f.departure_city,
+f.arrival_city,
+f.aircraft_code,
+count( tf.ticket_no ) AS fact_passengers,
+( SELECT count( s.seat_no )
+FROM seats s
+WHERE s.aircraft_code = f.aircraft_code
+) AS total_seats
+FROM flights_v f
+JOIN ticket_flights tf ON f.flight_id = tf.flight_id
+WHERE f.status = 'Arrived'
+GROUP BY 1, 2, 3, 4, 5, 6
+)
+SELECT ts.flight_id,
+ts.flight_no,
+ts.scheduled_departure_local,
+ts.departure_city,
+ts.arrival_city,
+a.model,
+ts.fact_passengers,
+ts.total_seats,
+round( ts.fact_passengers::numeric /
+ts.total_seats::numeric, 2 ) AS fraction
+FROM ts
+JOIN aircrafts AS a ON ts.aircraft_code = a.aircraft_code
+ORDER BY ts.scheduled_departure_local;
 
+-- рекурсивного общего табличного выражения:
+-- вместо вирт таблицу values (0,100000), (100000, 200000)...
+WITH RECURSIVE ranges ( min_sum, max_sum ) AS
+( VALUES ( 0, 100000 )
+UNION ALL -- UNION выполняется устранение строк-дубликатов
+SELECT min_sum + 100000, max_sum + 100000
+FROM ranges
+WHERE max_sum <
+( SELECT max( total_amount ) FROM bookings )
+)
+SELECT * FROM ranges;
 
-
-
-
-
-
-
+-- КОнТРОЛЬНЫЕ ВОПРОСЫ
 
 
 
