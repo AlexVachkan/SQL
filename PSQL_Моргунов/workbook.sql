@@ -1448,22 +1448,77 @@ SELECT * FROM ranges;
 -- Решение позже 
 
 -- ГЛАВА 7
--- создадим временную таблицу 
+
+-- вставка строк в талицах
+-- создадим временные таблицы 
 CREATE TEMP TABLE aircrafts_tmp AS
 	SELECT * FROM aircrafts WITH NO DATA;
 	
+CREATE TEMP TABLE aircrafts_log AS
+	SELECT * FROM aircrafts WITH NO DATA;
+	
 SELECT * FROM aircrafts_tmp;
+SELECT * FROM aircrafts_log;
 
+drop table aircrafts_tmp;
+drop table aircrafts_log;
 
+-- создадим огрнаничения для временной таблицы
+ALTER TABLE aircrafts_tmp
+	ADD PRIMARY KEY ( aircraft_code );
 
+ALTER TABLE aircrafts_tmp
+	ADD UNIQUE ( model );
 
+ALTER TABLE aircrafts_log
+	ADD COLUMN when_add timestamp;
 
+ALTER TABLE aircrafts_log
+	ADD COLUMN operation text;
 
+-- Алтернатива для создания временной(можно и постоянной) таблицы с like 
+CREATE TEMP TABLE aircrafts_tmp
+	( LIKE aircrafts INCLUDING CONSTRAINTS INCLUDING INDEXES );
 
+-- в log мы записываем все операции что происходят с tmp
+-- так же есть правила rules(правило перезаписи)
+WITH add_row AS
+( INSERT INTO aircrafts_tmp -- копируем данные из таблицы aircrafts
+		SELECT * FROM aircrafts
+		RETURNING * -- возвращает строки во внешний запрос
+)
+INSERT INTO aircrafts_log
+	SELECT add_row.aircraft_code, add_row.model, add_row.range,
+		current_timestamp as when_add, 'INSERT' as operation
+	FROM add_row;
+	
+SELECT * FROM aircrafts_tmp;
+SELECT * FROM aircrafts_log;
 
+drop table aircrafts_tmp;
+drop table aircrafts_log;
 
+-- ON CONFLICT(обработка ошибок) при вставке новых строк если есть ошибка он ее не выдаст и 
+-- строку не добавит 
+WITH add_row AS
+( INSERT INTO aircrafts_tmp
+	VALUES ( 'SU6', 'Sukhoi SuperJet-100', 3000 ) -- SU9 insert 0 0(так как строка есть уже) SU7 insert 0 1
+	ON CONFLICT DO NOTHING -- ON CONFLICT(aircraft_code) DO NOTHING так же можно указывать по столбцу что бы ошибки пропускал
+	RETURNING *
+)
+INSERT INTO aircrafts_log
+	SELECT add_row.aircraft_code, add_row.model, add_row.range,
+		current_timestamp, 'INSERT'
+	FROM add_row;
 
+-- для массового ввод строк COPY
 
+COPY aircrafts_tmp FROM '/home/postgres/aircrafts.txt'; -- из таблицы
+
+COPY aircrafts_tmp TO '/home/postgres/aircrafts_tmp.txt' -- в таблицу
+WITH ( FORMAT csv );
+
+-- обновления строк в талицах
 
 
 
