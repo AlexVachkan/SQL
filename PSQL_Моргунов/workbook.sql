@@ -1444,9 +1444,15 @@ WHERE max_sum <
 )
 SELECT * FROM ranges;
 
--- КОнТРОЛЬНЫЕ ВОПРОСЫ
+-- КОНТРОЛЬНЫЕ ВОПРОСЫ
+-- Решение позже 
 
-
+-- ГЛАВА 7
+-- создадим временную таблицу 
+CREATE TEMP TABLE aircrafts_tmp AS
+	SELECT * FROM aircrafts WITH NO DATA;
+	
+SELECT * FROM aircrafts_tmp;
 
 
 
