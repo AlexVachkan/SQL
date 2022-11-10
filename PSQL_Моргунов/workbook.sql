@@ -1519,11 +1519,62 @@ COPY aircrafts_tmp TO '/home/postgres/aircrafts_tmp.txt' -- в таблицу
 WITH ( FORMAT csv );
 
 -- обновления строк в талицах
+WITH update_row AS
+( UPDATE aircrafts_tmp
+	SET range = range * 1.5
+	WHERE model ~ '^Su'
+	RETURNING *
+)
+INSERT INTO aircrafts_log
+	SELECT ur.aircraft_code, ur.model, ur.range,
+		current_timestamp, 'UPDATE'
+	FROM update_row ur;
 
+SELECT * FROM aircrafts_tmp;
+SELECT * FROM aircrafts_log;
 
+drop table aircrafts_tmp;
+drop table aircrafts_log;
 
+-- удаление строк
+WITH update_row AS
+( DELETE from aircrafts_tmp
+	WHERE model ~ '^Su'
+	RETURNING *
+)
+INSERT INTO aircrafts_log
+	SELECT ur.aircraft_code, ur.model, ur.range,
+		current_timestamp, 'DELETE'
+	FROM update_row ur;
 
+SELECT * FROM aircrafts_tmp;
+SELECT * FROM aircrafts_log;
 
+drop table aircrafts_tmp;
+drop table aircrafts_log;
+
+-- c использованием using
+WITH min_ranges AS
+( SELECT aircraft_code,
+		rank() OVER (
+			PARTITION BY left( model, 6 )
+			ORDER BY range
+	) AS rank
+  FROM aircrafts_tmp
+  WHERE model ~ '^Airbus' OR model ~ '^Boeing'
+)
+DELETE FROM aircrafts_tmp a
+USING min_ranges mr
+WHERE a.aircraft_code = mr.aircraft_code
+AND mr.rank = 1
+RETURNING *;
+
+-- удаляем все строки
+DELETE FROM aircrafts_tmp;
+TRUNCATE aircrafts_tmp;
+
+drop table aircrafts_tmp;
+drop table aircrafts_log;
 
 
 
