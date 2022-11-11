@@ -1576,5 +1576,199 @@ TRUNCATE aircrafts_tmp;
 drop table aircrafts_tmp;
 drop table aircrafts_log;
 
+-- ГЛАВА 8
+
+-- создание индекса, так же индекс автоматом создается при задание первичного ключа
+-- и огрначение уникальности
+
+CREATE INDEX
+  ON airports ( airport_name );
+  
+\timing on --включаем секундомер
+
+SELECT count( * )
+FROM tickets
+WHERE passenger_name = 'IVAN IVANOV';
+
+-- 191,862 мс, создаем индекс
+
+CREATE INDEX passenger_name
+ON tickets ( passenger_name );
+-- 1,644 мс, время уменьшолсь значителньо!
+
+\di -- посмотреть все индексы
+
+-- удаление индекса
+DROP INDEX имя-индекса;
+--либо 
+DROP INDEX passenger_name;
+
+-- создание индекса по нескольким столбцам
+CREATE INDEX tickets_book_ref_test_key
+  ON tickets ( book_ref );
+
+SELECT *
+FROM tickets
+ORDER BY book_ref
+LIMIT 5;
+-- 1,369 мс
+DROP INDEX tickets_book_ref_test_key;
+
+SELECT *
+FROM tickets
+ORDER BY book_ref
+LIMIT 5;
+-- 403,992 мс
+
+CREATE INDEX имя-индекса
+  ON имя-таблицы ( имя-столбца NULLS FIRST, ... );
+CREATE INDEX имя-индекса
+  ON имя-таблицы ( имя-столбца DESC NULLS LAST, ... ); -- убыв порядок индексов, null в конец
+  
+-- уникальные индексы
+CREATE UNIQUE INDEX aircrafts_unique_model_key
+  ON aircrafts_data ( model );
+  
+-- В этом случае мы уже не сможем ввести в таблицу aircrafts строки, имеющие оди-
+-- наковые наименования моделей самолетов
+
+-- индексы на основе выражений
+CREATE UNIQUE INDEX aircrafts_unique_model_key
+  ON aircrafts ( lower( model ) );
+-- если захотим добавить модель отличную только регистром то выдаст ошибку
+/*Ключ "(lower(model))=(cessna 208 caravan)" уже существует.*/
+
+-- частичные индексы
+
+CREATE INDEX bookings_book_date_part_key
+  ON bookings ( book_date )
+  WHERE total_amount > 1000000;
+-- можно выйграть во времени, но не сильно относительно полных индексов
+
+-- ГЛАВА 9
+
+-- уровень изоляции Read Uncommitted
+
+CREATE TABLE aircrafts_tmp
+  AS SELECT * FROM aircrafts;
+
+-- запустим парадллельно два psql и выполним 
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SHOW transaction_isolation;
+
+UPDATE aircrafts_tmp
+  SET range = range + 100
+  WHERE aircraft_code = 'SU9';
+
+SELECT *
+  FROM aircrafts_tmp
+  WHERE aircraft_code = 'SU9';
+-- мы увидим что второй psql не видит изменений в таблице  
+
+-- отменим транзакцию
+ROLLBACK;
+
+-- Уровень изоляции Read Committed
+CREATE TABLE aircrafts_tmp
+  AS SELECT * FROM aircrafts;
+
+-- запустим парадллельно два psql и выполним 
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+SHOW transaction_isolation;
+
+UPDATE aircrafts_tmp
+  SET range = range + 100
+  WHERE aircraft_code = 'SU9';
+
+SELECT *
+  FROM aircrafts_tmp
+  WHERE aircraft_code = 'SU9';
+-- мы увидим что второй psql не видит изменений в таблице  
+
+-- завершим транзакцию
+END; -- или
+COMMIT;
+
+-- Уровень изоляции Repeatable Read
+
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+INSERT INTO aircrafts_tmp
+  VALUES ( 'IL9', 'Ilyushin IL96', 9800 );
+  
+END; 
+-- тут нельзя параллельно менять, пока незавершим первую транзакцию
+  
 
 
+-- Уровень изоляции Serializable
+
+CREATE TABLE modes (
+num integer,
+mode text
+);
+
+INSERT INTO modes VALUES ( 1, 'LOW' ), ( 2, 'HIGH' );
+
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+UPDATE modes
+SET mode = 'HIGH'
+WHERE mode = 'LOW'
+RETURNING *;
+
+-- тут  же меняю пераллеьно данные 
+commit;
+
+-- не даст закоммитеть, так как есть другие изменения 
+-- только последовательно!
+
+-- пример использования транзакции
+BEGIN;
+-- добавляем строку рейс, время сейчас, цену билетов равную 0
+INSERT INTO bookings ( book_ref, book_date, total_amount )
+VALUES ( 'ABC123', bookings.now(), 0 );
+
+--добавляем два билета
+INSERT INTO tickets ( ticket_no, book_ref, passenger_id, passenger_name)
+VALUES ( '9991234567890', 'ABC123', '1234 123456', 'IVAN PETROV' );
+
+INSERT INTO tickets ( ticket_no, book_ref, passenger_id, passenger_name)
+VALUES ( '9991234567891', 'ABC123', '4321 654321', 'PETR IVANOV' );
+
+-- считаем стоимость билетов и добавлям в атрибут тотал_амоунт
+UPDATE bookings
+SET total_amount =
+  ( SELECT sum( amount )
+    FROM ticket_flights
+    WHERE ticket_no IN
+       ( SELECT ticket_no
+         FROM tickets
+         WHERE book_ref = 'ABC123'
+       )
+    )
+WHERE book_ref = 'ABC123';
+
+SELECT *
+FROM bookings
+WHERE book_ref = 'ABC123';
+
+/* 
+book_ref  | book_date              | total_amount
+----------+------------------------+--------------
+ABC123    | 2016-10-13 22:00:00+08 | 42000.00
+*/
+
+COMMIT;
+
+-- БЛОКИРОВКИ
+
+SELECT *
+FROM aircrafts_tmp
+WHERE model ~ '^Air'
+FOR UPDATE; -- блокируем отдельные строки
+
+LOCK TABLE aircrafts_tmp -- блокируем таблицы
+IN ACCESS EXCLUSIVE MODE; 
