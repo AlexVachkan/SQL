@@ -1772,3 +1772,169 @@ FOR UPDATE; -- блокируем отдельные строки
 
 LOCK TABLE aircrafts_tmp -- блокируем таблицы
 IN ACCESS EXCLUSIVE MODE; 
+
+-- ГЛАВА 10
+
+EXPLAIN SELECT *
+FROM aircrafts;
+/* 
+Seq Scan on aircrafts_data ml  (cost=0.00..3.36 rows=9 width=52)
+послед просмотр - sequential scan
+0.00 - оченка ресурсов
+3.36 - оценка стоимости в условных единицах
+9 - общее число строк
+52 - средний вес строки, байт 
+*/
+
+-- если не интересуют численные оценки а только способ просмотра
+EXPLAIN ( COSTS OFF ) SELECT *
+FROM aircrafts;
+
+EXPLAIN SELECT *
+FROM aircrafts
+WHERE model ~ 'Air';
+
+EXPLAIN SELECT *
+FROM aircrafts
+ORDER BY aircraft_code;
+
+EXPLAIN SELECT *
+FROM bookings
+ORDER BY book_ref;
+
+EXPLAIN SELECT *
+FROM bookings
+WHERE book_ref > '0000FF' AND book_ref < '000FFF'
+ORDER BY book_ref;
+
+EXPLAIN SELECT *
+FROM seats
+WHERE aircraft_code = 'SU9';
+
+EXPLAIN SELECT book_ref
+FROM bookings
+WHERE book_ref < '000FFF'
+ORDER BY book_ref;
+
+EXPLAIN SELECT count( * )
+FROM seats
+WHERE aircraft_code = 'SU9';
+
+EXPLAIN SELECT avg( total_amount )
+FROM bookings;
+
+
+-- методы формирования соединенийнабров строк
+
+-- метод соединения вложенный цикл(nestedloop),
+-- на соснове хеширования
+-- на основе слияния
+
+--пример
+EXPLAIN SELECT a.aircraft_code,
+a.model,
+s.seat_no,
+s.fare_conditions
+FROM seats s
+JOIN aircrafts a ON s.aircraft_code = a.aircraft_code
+WHERE a.model ~ '^Air'
+ORDER BY s.seat_no;
+
+-- управление планировщиком
+SET enable_hashjoin = off;
+SET enable_mergejoin = off;
+SET enable_nestloop = off;
+
+-- анализ
+EXPLAIN ANALYZE
+SELECT t.ticket_no,
+t.passenger_name,
+tf.flight_id,
+tf.amount
+FROM tickets t
+JOIN ticket_flights tf ON t.ticket_no = tf.ticket_no
+ORDER BY t.ticket_no;
+
+EXPLAIN (ANALYZE, COSTS OFF)
+SELECT a.aircraft_code,
+a.model,
+s.seat_no,
+s.fare_conditions
+FROM seats s
+JOIN aircrafts a ON s.aircraft_code = a.aircraft_code
+WHERE a.model ~ '^Air'
+ORDER BY s.seat_no;
+
+
+BEGIN;
+EXPLAIN (ANALYZE, COSTS OFF)
+UPDATE aircrafts
+SET range = range + 100
+WHERE model ~ '^Air';
+ROLLBACK;
+
+/*
+Повлиять на скорость выполнения запроса можно различными способами, мы рас-
+смотрим некоторые из них:
+– обновление статистики, на основе которой планировщик строит планы;
+
+– изменение исходного кода запроса;
+
+– изменение схемы данных, связанное с денормализацией: создание материализо-
+ванных представлений и временных таблиц, создание индексов, использование
+вычисляемых столбцов таблиц;
+
+– изменение параметров планировщика, управляющих выбором порядка соедине-
+ния наборов строк: использование общих табличных выражений (запросы с пред-
+ложением WITH), использование фиксированного порядка соединения (параметр
+join_collapse_limit = 1), запрет раскрытия подзапросов и преобразования их
+в соединения таблиц (параметр from_collapse_limit = 1);
+
+– изменение параметров планировщика, управляющих выбором метода досту-
+па к данным (enable_seqscan, enable_indexscan, enable_indexonlyscan,
+enable_bitmapscan) и способа соединения наборов строк (enable_nestloop,
+enable_hashjoin, enable_mergejoin);
+
+– изменение параметров планировщика, управляющих использованием ряда опе-
+раций: агрегирование на основе хеширования (enable_hashagg), материализа-
+ция временных наборов строк (enable_material), выполнение явной сортиров-
+ки при наличии других возможностей (enable_sort).
+*/
+
+-- обновление статистики таблицы
+ANALYZE aircrafts_data;
+
+-- ПРИМЕР ОПТИМИЗАЦИИ
+
+-- просмортим план нашего запроса
+EXPLAIN
+SELECT num_tickets, count( * ) AS num_bookings
+FROM
+  ( SELECT b.book_ref,
+    ( SELECT count( * ) FROM tickets t
+      WHERE t.book_ref = b.book_ref
+     )
+FROM bookings b
+WHERE date_trunc( 'mon', book_date ) = '2016-09-01'
+) AS count_tickets( book_ref, num_tickets )
+GROUP by num_tickets
+ORDER BY num_tickets DESC;
+-- запрос получился очень тяжелый  cost=0.00..12510650.16
+
+-- ебашим индексы
+CREATE INDEX tickets_book_ref_key
+ON tickets ( book_ref );
+-- запускаем процесс cost=0.00..12510.16
+
+-- так же можно изменить позапрос
+EXPLAIN ANALYZE
+SELECT num_tickets, count( * ) AS num_bookings
+FROM
+( SELECT b.book_ref, count( * )
+FROM bookings b, tickets t
+WHERE date_trunc( 'mon', b.book_date ) = '2016-09-01'
+AND t.book_ref = b.book_ref
+GROUP BY b.book_ref
+) AS count_tickets( book_ref, num_tickets )
+GROUP by num_tickets
+ORDER BY num_tickets DESC;
